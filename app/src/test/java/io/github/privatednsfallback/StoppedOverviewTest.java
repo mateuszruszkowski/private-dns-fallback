@@ -32,6 +32,27 @@ public class StoppedOverviewTest {
   }
 
   @Test
+  public void strandedOverviewShowsTheStoredReasonAndRecoveryAction() {
+    Context c = RuntimeEnvironment.getApplication();
+    String reason = "Background launch blocked · check Android Private DNS";
+    Config.prefs(c)
+        .edit()
+        .putString("host", "mine.example")
+        .putString("ownedHost", "mine.example")
+        .putString("ownedMode", "hostname")
+        .putString("notice", reason)
+        .commit();
+    Settings.Global.putString(c.getContentResolver(), Config.SPECIFIER, "mine.example");
+    Settings.Global.putString(c.getContentResolver(), Config.MODE, "hostname");
+    try (var activity = Robolectric.buildActivity(MainActivity.class).setup()) {
+      assertTrue(
+          shows(
+              activity.get().getWindow().getDecorView(),
+              reason + "\nOpen Setup to restore Automatic DNS"));
+    }
+  }
+
+  @Test
   public void refusedStartPreservesProviderAndExplainsWhyOnOverview() {
     Context c = RuntimeEnvironment.getApplication();
     Config.prefs(c)

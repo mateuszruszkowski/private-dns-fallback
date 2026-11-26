@@ -96,7 +96,7 @@ public final class DnsService extends Service {
     } catch (SecurityException denied) {
       notice = "Background launch blocked · check Android Private DNS";
     }
-    Config.prefs(context).edit().putString("notice", notice).apply();
+    Config.prefs(context).edit().putString("notice", notice).commit();
   }
 
   @Override

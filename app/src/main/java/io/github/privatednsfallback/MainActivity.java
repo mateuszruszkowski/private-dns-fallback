@@ -500,6 +500,10 @@ public final class MainActivity extends Activity {
                             ? "Network resolver · VPN connected"
                             : "Network resolver · VPN disconnected")
                         : DnsService.message;
+    if (stranded) {
+      String notice = prefs.getString("notice", "");
+      if (!notice.isEmpty() && !"Stopped".equals(notice)) sub = notice + "\n" + sub;
+    }
     if (!sub.contentEquals(provider.getText())) provider.setText(sub);
     route.route(vpn, healthy);
     serviceControl.setText(live ? "Manage monitoring   ›" : "Start monitoring   ›");

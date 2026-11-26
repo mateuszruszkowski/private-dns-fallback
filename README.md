@@ -67,7 +67,7 @@ The foreground service responds to Android network callbacks and rechecks approx
 
 The service checks Android’s mode and hostname immediately before writing each setting. Android exposes them as two separate keys and does not provide an atomic compare-and-set for the pair. A simultaneous system settings edit can still race with a write. If the process dies mid-change, the app treats an exact match to its pending target as a completed write. Android cannot distinguish that state from a manual choice of the identical pair. To set a manual provider, stop monitoring first.
 
-In **Setup**, tap **Stop monitoring** before uninstalling. Force-stop, process termination, revoking the grant and uninstalling can prevent cleanup while strict DNS is active. If that happens, select **Automatic** in Android's Private DNS settings, or run:
+In **Setup**, tap **Stop monitoring** before uninstalling. Force-stop, process termination, revoking the grant and uninstalling can prevent cleanup while strict DNS is active. If the manufacturer blocks the boot receiver itself, the app cannot run cleanup after a restart. Check the device’s autostart setting. To recover DNS manually, select **Automatic** in Android's Private DNS settings, or run:
 
 ```sh
 adb shell settings put global private_dns_mode opportunistic
