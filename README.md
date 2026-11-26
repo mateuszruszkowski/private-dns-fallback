@@ -25,9 +25,17 @@ This is useful when a Pi-hole is reachable only through a private network such a
 4. Connect the VPN, then tap **Start monitoring**. If a different strict provider is already active, select Automatic in Android's Private DNS settings before handing control to the app.
 5. Check filtering with mobile data while Wi-Fi is off. Disconnect the VPN and open a previously unused hostname. Reconnect the VPN and confirm that the app shows **Private DNS active** again. Check your resolver log for a query from the phone if you need end-to-end evidence.
 
+## Service controls and startup
+
+Open **Overview** to see the current DNS mode and connection checks. Use **Setup** for the resolver, permissions and startup controls. Tap a row for its evidence and a relevant action. The **Monitoring service** row shows whether the service is running in the current process. **Resume after restart** shows the saved request to restart after boot or an app update. Vendor autostart controls can still affect delivery.
+
+**Start monitoring** starts an independent foreground service. Back, Home and closing the control screen leave monitoring active. To change an endpoint while monitoring, edit the fields and tap **Apply changes**. **Stop monitoring** ends monitoring, disables resume after boot, and releases the strict setting if the app still owns it. Android then uses Automatic DNS and retains the last provider hostname for future use. If Android refuses a start or a change of provider stops monitoring, Overview shows the reason.
+
+**Private resolver** reports a TLS/DNS probe through the VPN. **Android DNS** shows the system setting and the outcome of a separate uncached Android lookup. A successful lookup does not identify which IP Android validated for DoT. Repeated system lookup failures trigger Automatic DNS and a retry delay. Open **Background activity** and **Resume after restart** for setup guidance if your phone restricts the service.
+
 ## Remembered settings and optional local defaults
 
-While monitoring is stopped, both fields remember your edits on the device, even if you leave before tapping **Start monitoring**. Starting the service validates and saves the active configuration. Reopening the app or installing a signed update preserves it. Clearing application data or uninstalling removes saved settings.
+Both fields remember your edits on the device, even if you leave before tapping **Start monitoring**. Starting the service validates and saves the active configuration. Reopening the app or installing a signed update preserves it. Clearing application data or uninstalling removes saved settings.
 
 Public builds start with empty fields and example placeholders. To prefill your own resolver on a fresh installation, create the following file in your local checkout:
 
@@ -51,13 +59,15 @@ Replace both examples with your endpoint. Run `./gradlew :app:assemblePersonal`,
 | VPN lost, TLS error, DNS timeout or unusable answer | Select Automatic DNS. Normal resolution is subject to the current network's own DNS availability. |
 | VPN recovers | Restore the configured hostname after a successful probe. |
 
-The foreground service responds to Android network callbacks and rechecks approximately every 30 seconds while running. Socket connect and read timeouts are three seconds each. Background scheduling, a sleeping device and Android's own provider validation can delay transitions. During a failure, a lookup may time out before fallback completes. Automatic mode allows network-provider DNS, so filtering and encrypted DNS are not guaranteed during fallback. Browsers or apps with their own DNS can also bypass Android's setting.
+The foreground service responds to Android network callbacks and rechecks approximately every 30 seconds while running. Socket connect and read timeouts are three seconds each. A separate six-second deadline covers the entire TLS and DNS probe, including partial responses. Background scheduling, a sleeping device and Android's own provider validation can delay transitions. During a failure, a lookup may time out before fallback completes. Automatic mode allows network-provider DNS, so filtering and encrypted DNS are not guaranteed during fallback. Browsers or apps with their own DNS can also bypass Android's setting.
 
 ## Permissions and recovery
 
 **WRITE_SECURE_SETTINGS** is a broad Android development permission. The app uses it for two global settings, `private_dns_mode` and `private_dns_specifier`. The resolver configuration stays in the app's device-protected storage so monitoring can resume at boot. The app sends its health query to the chosen resolver and has no analytics or external control service.
 
-Tap **Stop and use Automatic DNS** before uninstalling. Force-stop, process termination, revoking the grant and uninstalling can prevent cleanup while strict DNS is active. If that happens, select **Automatic** in Android's Private DNS settings, or run:
+The service checks Android’s mode and hostname immediately before writing each setting. Android exposes them as two separate keys and does not provide an atomic compare-and-set for the pair. A simultaneous system settings edit can still race with a write. If the process dies mid-change, the app treats an exact match to its pending target as a completed write. Android cannot distinguish that state from a manual choice of the identical pair. To set a manual provider, stop monitoring first.
+
+In **Setup**, tap **Stop monitoring** before uninstalling. Force-stop, process termination, revoking the grant and uninstalling can prevent cleanup while strict DNS is active. If the manufacturer blocks the boot receiver itself, the app cannot run cleanup after a restart. Check the device’s autostart setting. To recover DNS manually, select **Automatic** in Android's Private DNS settings, or run:
 
 ```sh
 adb shell settings put global private_dns_mode opportunistic

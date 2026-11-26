@@ -1,0 +1,5 @@
+<resources><style name="MonitorTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <item name="android:fontFamily">sans-serif</item><item name="android:colorAccent">#81DABC</item>
+    <item name="android:windowLightStatusBar">false</item><item name="android:windowLightNavigationBar">false</item>
+    <item name="android:windowBackground">#101B1B</item>
+</style></resources>
