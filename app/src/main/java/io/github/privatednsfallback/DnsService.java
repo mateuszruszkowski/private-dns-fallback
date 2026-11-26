@@ -64,6 +64,7 @@ public final class DnsService extends Service {
   public void onCreate() {
     super.onCreate();
     p = Config.prefs(this);
+    Config.migrateLegacyOwnership(this);
     cm = getSystemService(ConnectivityManager.class);
     NotificationManager nm = getSystemService(NotificationManager.class);
     nm.createNotificationChannel(
@@ -85,22 +86,13 @@ public final class DnsService extends Service {
         main);
     cm.registerDefaultNetworkCallback(defaultChanges, main);
     registered = true;
-    // Adopt the previous version's managed strict profile once, on upgrade.
-    if (!p.contains("ownershipVersion")) {
-      var edit = p.edit().putInt("ownershipVersion", 1);
-      if (p.getBoolean("enabled", false)
-          && "hostname".equals(Config.read(this, Config.MODE))
-          && Objects.equals(p.getString("host", ""), Config.read(this, Config.SPECIFIER))) {
-        edit.putString("ownedMode", "hostname").putString("ownedHost", p.getString("host", ""));
-      }
-      edit.commit();
-    }
   }
 
   static void backgroundLaunchBlocked(Context context) {
     String notice = "Background launch blocked · open the app to resume";
     try {
-      Config.release(context);
+      Config.migrateLegacyOwnership(context);
+      Config.yieldForRestart(context);
     } catch (SecurityException denied) {
       notice = "Background launch blocked · check Android Private DNS";
     }
@@ -424,7 +416,7 @@ public final class DnsService extends Service {
     }
     probes.shutdownNow();
     try {
-      Config.release(this);
+      if (registered) Config.yieldForRestart(this);
     } catch (SecurityException ignored) {
     }
     super.onDestroy();

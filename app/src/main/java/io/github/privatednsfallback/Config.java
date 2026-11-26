@@ -142,6 +142,35 @@ final class Config {
       throw new SecurityException("DNS setting changed");
   }
 
+  static void migrateLegacyOwnership(Context c) {
+    SharedPreferences p = prefs(c);
+    if (p.contains("ownershipVersion")) return;
+    SharedPreferences.Editor edit = p.edit().putInt("ownershipVersion", 1);
+    if (!p.getBoolean("observing", false)
+        && !p.contains("pendingMode")
+        && !p.contains("ownedMode")
+        && p.getBoolean("enabled", false)) {
+      DnsPair previous = actual(c);
+      if ("hostname".equals(previous.mode)
+          && Objects.equals(p.getString("host", ""), previous.host)) {
+        observe(edit, previous)
+            .putString("ownedMode", previous.mode)
+            .putString("ownedHost", previous.host);
+      }
+    }
+    persist(edit);
+  }
+
+  static void yieldForRestart(Context c) {
+    SharedPreferences p = prefs(c);
+    if (p.getBoolean("enabled", false)) {
+      // Keep the expected pair so a later automatic start can detect a manual change.
+      prepareProfile(c, p.getString("host", ""));
+    } else {
+      release(c);
+    }
+  }
+
   static void release(Context c) {
     recover(c);
     if (ownsStrict(c) && matches(c)) select(c, null);

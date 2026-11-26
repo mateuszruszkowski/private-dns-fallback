@@ -63,7 +63,57 @@ public class BootRecoveryTest {
   }
 
   @Test
+  public void rejectedUpgradeFromLegacyStrictStillFallsBack() {
+    Config.prefs(c)
+        .edit()
+        .clear()
+        .putBoolean("enabled", true)
+        .putString("host", "dns.example")
+        .putString("address", "192.0.2.53")
+        .commit();
+    denyLaunch(Intent.ACTION_MY_PACKAGE_REPLACED);
+    assertEquals("opportunistic", Config.read(c, Config.MODE));
+    assertTrue(Config.prefs(c).getBoolean("enabled", false));
+  }
+
+  @Test
+  public void deniedLegacyUpdateLeavesDifferentStrictProviderAlone() {
+    Config.prefs(c)
+        .edit()
+        .clear()
+        .putBoolean("enabled", true)
+        .putString("host", "dns.example")
+        .commit();
+    Settings.Global.putString(c.getContentResolver(), Config.SPECIFIER, "manual.example");
+    denyLaunch(Intent.ACTION_MY_PACKAGE_REPLACED);
+    assertFalse(Config.ownsStrict(c));
+    assertEquals("hostname", Config.read(c, Config.MODE));
+    assertEquals("manual.example", Config.read(c, Config.SPECIFIER));
+  }
+
+  @Test
+  public void manualOffAfterRefusedStartSurvivesStickyResume() {
+    denyLaunch(Intent.ACTION_BOOT_COMPLETED);
+    Settings.Global.putString(c.getContentResolver(), Config.MODE, "off");
+    var service = Robolectric.buildService(DnsService.class).create();
+    try {
+      service.get().onStartCommand(null, 0, 1);
+      assertFalse(DnsService.running);
+      assertEquals("off", Config.read(c, Config.MODE));
+    } finally {
+      service.destroy();
+    }
+  }
+
+  @Test
   public void rejectedBootLaunchReleasesOwnedStrictAndKeepsResumeRequest() {
+    denyLaunch(Intent.ACTION_BOOT_COMPLETED);
+    assertEquals("opportunistic", Config.read(c, Config.MODE));
+    assertTrue(Config.prefs(c).getBoolean("enabled", false));
+    assertTrue(Config.prefs(c).getString("notice", "").contains("launch blocked"));
+  }
+
+  private void denyLaunch(String action) {
     Context blocked =
         new ContextWrapper(c) {
           @Override
@@ -71,9 +121,6 @@ public class BootRecoveryTest {
             throw new IllegalStateException("Background launch denied");
           }
         };
-    new BootReceiver().onReceive(blocked, new Intent(Intent.ACTION_BOOT_COMPLETED));
-    assertEquals("opportunistic", Config.read(c, Config.MODE));
-    assertTrue(Config.prefs(c).getBoolean("enabled", false));
-    assertTrue(Config.prefs(c).getString("notice", "").contains("launch blocked"));
+    new BootReceiver().onReceive(blocked, new Intent(action));
   }
 }
