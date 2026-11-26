@@ -1,0 +1,18 @@
+plugins {
+    id 'com.android.application' version '9.4.1'
+}
+android {
+    namespace 'io.github.privatednsfallback'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'io.github.privatednsfallback'
+        minSdk 30
+        targetSdk 36
+        versionCode 1
+        versionName '0.1.0'
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}
