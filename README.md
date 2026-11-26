@@ -25,9 +25,17 @@ This is useful when a Pi-hole is reachable only through a private network such a
 4. Connect the VPN, then tap **Start monitoring**. If a different strict provider is already active, select Automatic in Android's Private DNS settings before handing control to the app.
 5. Check filtering with mobile data while Wi-Fi is off. Disconnect the VPN and open a previously unused hostname. Reconnect the VPN and confirm that the app shows **Private DNS active** again. Check your resolver log for a query from the phone if you need end-to-end evidence.
 
+## Service controls and startup
+
+Open the app to see the live status panel. Tap a row for its evidence and a relevant action. The **Monitoring service** row shows whether the service is running in the current process. **Resume after restart** shows the saved request to restart after boot or an app update. Vendor autostart controls can still affect delivery.
+
+**Start monitoring** starts an independent foreground service. Back, Home and closing the control screen leave monitoring active. To change an endpoint while monitoring, edit the fields and tap **Apply changes**. **Stop and use Automatic DNS** ends monitoring, disables resume after boot, and releases the strict setting if the app still owns it.
+
+**Private resolver** reports a TLS/DNS probe through the VPN. **Android DNS** shows the system setting and the outcome of a separate uncached Android lookup. A successful lookup does not identify which IP Android validated for DoT. Repeated system lookup failures trigger Automatic DNS and a retry delay. Open **Background activity** and **Resume after restart** for setup guidance if your phone restricts the service.
+
 ## Remembered settings and optional local defaults
 
-While monitoring is stopped, both fields remember your edits on the device, even if you leave before tapping **Start monitoring**. Starting the service validates and saves the active configuration. Reopening the app or installing a signed update preserves it. Clearing application data or uninstalling removes saved settings.
+Both fields remember your edits on the device, even if you leave before tapping **Start monitoring**. Starting the service validates and saves the active configuration. Reopening the app or installing a signed update preserves it. Clearing application data or uninstalling removes saved settings.
 
 Public builds start with empty fields and example placeholders. To prefill your own resolver on a fresh installation, create the following file in your local checkout:
 
