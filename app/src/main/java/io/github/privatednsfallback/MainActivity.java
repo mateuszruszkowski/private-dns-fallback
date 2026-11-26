@@ -362,11 +362,15 @@ public final class MainActivity extends Activity {
       if (!h.contains(".") || InetAddresses.isNumericAddress(h))
         throw new IllegalArgumentException();
     } catch (IllegalArgumentException e) {
+      selectTab(true);
+      host.requestFocus();
       host.setError("Enter a fully qualified TLS hostname");
       return;
     }
     String ip = address.getText().toString().trim();
     if (!InetAddresses.isNumericAddress(ip)) {
+      selectTab(true);
+      address.requestFocus();
       address.setError("Enter an IPv4 or IPv6 address");
       return;
     }
