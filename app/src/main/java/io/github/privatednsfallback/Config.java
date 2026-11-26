@@ -85,6 +85,36 @@ final class Config {
     persist(edit);
   }
 
+  static DnsPair prepareProfile(Context c, String requested) {
+    recover(c);
+    SharedPreferences p = prefs(c);
+    DnsPair before;
+    if (p.getBoolean("observing", false)) before = stored(p, "base");
+    else if (p.contains("ownedMode")) before = stored(p, "owned");
+    else before = actual(c); // The user's explicit Start accepts this initial state.
+    before.requireUnchanged(actual(c));
+    boolean managed = stored(p, "owned").same(before) && p.contains("ownedMode");
+    if ("hostname".equals(before.mode) && !managed && !Objects.equals(requested, before.host)) {
+      throw new SecurityException("Android has a different DNS provider");
+    }
+    persist(observe(p.edit(), before));
+    if (managed && "hostname".equals(before.mode)) {
+      select(c, null);
+      before = new DnsPair("opportunistic", before.host);
+    }
+    before.requireUnchanged(actual(c));
+    return before;
+  }
+
+  private static void guardPreparedWrite(Context c, DnsPair expected) {
+    if (!expected.same(actual(c))) {
+      // This stage has not executed its write. A matching external target must not be adopted on
+      // recovery.
+      persist(prefs(c).edit().remove("pendingMode").remove("pendingHost"));
+      throw new SecurityException("DNS setting changed");
+    }
+  }
+
   static void select(Context c, String host) {
     recover(c);
     if (!matches(c)) throw new SecurityException("DNS setting changed");
@@ -100,10 +130,9 @@ final class Config {
         observe(p.edit(), before)
             .putString("pendingMode", target.mode)
             .putString("pendingHost", target.host));
-    before.requireUnchanged(actual(c));
+    guardPreparedWrite(c, before);
     if (host != null) write(c, SPECIFIER, host);
-    if (!actual(c).same(new DnsPair(before.mode, target.host)))
-      throw new SecurityException("DNS setting changed");
+    guardPreparedWrite(c, new DnsPair(before.mode, target.host));
     write(c, MODE, target.mode);
     recover(c);
     if (!stored(p, "owned").same(target) || !actual(c).same(target))

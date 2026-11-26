@@ -115,20 +115,14 @@ public final class DnsService extends Service {
     if (START.equals(action) || APPLY.equals(action)) {
       String host = intent.getStringExtra("host"), ip = intent.getStringExtra("address");
       if (host == null || ip == null) return START_NOT_STICKY;
-      if (!Config.matches(this)
-          || ("hostname".equals(Config.read(this, Config.MODE))
-              && !host.equals(Config.read(this, Config.SPECIFIER))
-              && !p.contains("ownedMode"))) {
-        stopMonitoring("Android has a different DNS setting");
-        return START_NOT_STICKY;
-      }
+      DnsPair expected;
       try {
-        Config.release(this);
+        expected = Config.prepareProfile(this, host);
       } catch (SecurityException ex) {
-        stopMonitoring("DNS permission required");
+        stopMonitoring("Check DNS permission and Android provider settings");
         return START_NOT_STICKY;
       }
-      Config.observe(p.edit(), Config.actual(this))
+      Config.observe(p.edit(), expected)
           .putString("host", host)
           .putString("address", ip)
           .remove("draft_host")
@@ -154,6 +148,7 @@ public final class DnsService extends Service {
     directOk = systemOk = null;
     strictSince = SystemClock.elapsedRealtime();
     retryAfter = 0;
+    retryDelay = 30000;
     status("Checking network");
     check();
     return START_STICKY;
