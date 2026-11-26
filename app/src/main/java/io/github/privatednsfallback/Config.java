@@ -18,12 +18,11 @@ final class Config {
     return Settings.Global.getString(c.getContentResolver(), key);
   }
 
-  private static void write(Context c, String key, String expected, String value) {
-    if (!Objects.equals(expected, read(c, key))) {
-      persist(prefs(c).edit().remove("pendingMode").remove("pendingHost"));
-      throw new SecurityException("Android DNS changed before write");
-    }
-    if (!Objects.equals(value, expected)
+  private static void write(Context c, String key, DnsPair expected, String value) {
+    // Protect the other key as well: changing only the provider still overrides our ownership.
+    guardPreparedWrite(c, expected);
+    String previous = MODE.equals(key) ? expected.mode : expected.host;
+    if (!Objects.equals(value, previous)
         && !Settings.Global.putString(c.getContentResolver(), key, value)) {
       throw new SecurityException("Android rejected the DNS setting");
     }
@@ -135,9 +134,9 @@ final class Config {
             .putString("pendingMode", target.mode)
             .putString("pendingHost", target.host));
     guardPreparedWrite(c, before);
-    if (host != null) write(c, SPECIFIER, before.host, host);
+    if (host != null) write(c, SPECIFIER, before, host);
     guardPreparedWrite(c, new DnsPair(before.mode, target.host));
-    write(c, MODE, before.mode, target.mode);
+    write(c, MODE, new DnsPair(before.mode, target.host), target.mode);
     recover(c);
     if (!stored(p, "owned").same(target) || !actual(c).same(target))
       throw new SecurityException("DNS setting changed");

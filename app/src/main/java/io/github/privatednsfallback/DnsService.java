@@ -24,6 +24,8 @@ public final class DnsService extends Service {
   private final Handler main = new Handler(Looper.getMainLooper());
   private final ExecutorService probes = Executors.newSingleThreadExecutor();
   private final Runnable refresh = this::check;
+  private static final long PROBE_BUDGET_MS = 6000;
+  private final Runnable deadline = this::probeTimedOut;
   private ConnectivityManager cm;
   private SharedPreferences p;
   private Socket socket;
@@ -163,6 +165,7 @@ public final class DnsService extends Service {
 
   private void cancel() {
     generation++;
+    main.removeCallbacks(deadline);
     main.removeCallbacks(refresh);
     if (socket != null) {
       try {
@@ -175,6 +178,14 @@ public final class DnsService extends Service {
       query.cancel();
       query = null;
     }
+  }
+
+  private void probeTimedOut() {
+    if (closing || !running || socket == null) return;
+    cancel();
+    probeAt = SystemClock.elapsedRealtime();
+    directOk = false;
+    automatic("Automatic DNS · resolver timed out");
   }
 
   private void stopMonitoring(String reason) {
@@ -224,7 +235,7 @@ public final class DnsService extends Service {
     Network n = vpn(cm);
     if (n == null) {
       probeAt = SystemClock.elapsedRealtime();
-      directOk = false;
+      directOk = null;
       automatic("Automatic DNS · VPN disconnected");
       return;
     }
@@ -232,6 +243,8 @@ public final class DnsService extends Service {
     try {
       Socket s = n.getSocketFactory().createSocket();
       socket = s;
+      long expires = SystemClock.elapsedRealtime() + PROBE_BUDGET_MS;
+      main.postDelayed(deadline, PROBE_BUDGET_MS);
       probes.execute(
           () -> {
             boolean ok = false;
@@ -243,6 +256,11 @@ public final class DnsService extends Service {
             main.post(
                 () -> {
                   if (!current(token, n)) return;
+                  if (SystemClock.elapsedRealtime() >= expires) {
+                    probeTimedOut();
+                    return;
+                  }
+                  main.removeCallbacks(deadline);
                   socket = null;
                   directOk = result;
                   probeAt = SystemClock.elapsedRealtime();
@@ -370,7 +388,7 @@ public final class DnsService extends Service {
       denied();
       return;
     }
-    if (retryAfter <= SystemClock.elapsedRealtime()) systemOk = null;
+    systemOk = null;
     status(msg);
     schedule(30000);
   }

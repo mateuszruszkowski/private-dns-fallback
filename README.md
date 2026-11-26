@@ -59,11 +59,13 @@ Replace both examples with your endpoint. Run `./gradlew :app:assemblePersonal`,
 | VPN lost, TLS error, DNS timeout or unusable answer | Select Automatic DNS. Normal resolution is subject to the current network's own DNS availability. |
 | VPN recovers | Restore the configured hostname after a successful probe. |
 
-The foreground service responds to Android network callbacks and rechecks approximately every 30 seconds while running. Socket connect and read timeouts are three seconds each. Background scheduling, a sleeping device and Android's own provider validation can delay transitions. During a failure, a lookup may time out before fallback completes. Automatic mode allows network-provider DNS, so filtering and encrypted DNS are not guaranteed during fallback. Browsers or apps with their own DNS can also bypass Android's setting.
+The foreground service responds to Android network callbacks and rechecks approximately every 30 seconds while running. Socket connect and read timeouts are three seconds each. A separate six-second deadline covers the entire TLS and DNS probe, including partial responses. Background scheduling, a sleeping device and Android's own provider validation can delay transitions. During a failure, a lookup may time out before fallback completes. Automatic mode allows network-provider DNS, so filtering and encrypted DNS are not guaranteed during fallback. Browsers or apps with their own DNS can also bypass Android's setting.
 
 ## Permissions and recovery
 
 **WRITE_SECURE_SETTINGS** is a broad Android development permission. The app uses it for two global settings, `private_dns_mode` and `private_dns_specifier`. The resolver configuration stays in the app's device-protected storage so monitoring can resume at boot. The app sends its health query to the chosen resolver and has no analytics or external control service.
+
+The service checks Android’s mode and hostname immediately before writing each setting. Android exposes them as two separate keys and does not provide an atomic compare-and-set for the pair. A simultaneous system settings edit can still race with a write. If the process dies mid-change, the app treats an exact match to its pending target as a completed write. Android cannot distinguish that state from a manual choice of the identical pair. To set a manual provider, stop monitoring first.
 
 In **Setup**, tap **Stop monitoring** before uninstalling. Force-stop, process termination, revoking the grant and uninstalling can prevent cleanup while strict DNS is active. If that happens, select **Automatic** in Android's Private DNS settings, or run:
 

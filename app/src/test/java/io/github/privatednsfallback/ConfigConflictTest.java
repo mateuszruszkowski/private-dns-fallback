@@ -91,6 +91,37 @@ public class ConfigConflictTest {
     return e;
   }
 
+  @Test
+  public void manualHostChangeAtLastModeReadPreservesStrict() {
+    Config.select(context, "managed.example");
+    int writesBefore = systemWrites;
+    int[] fallbackReads = {0};
+    beforeRead =
+        key -> {
+          if (Config.MODE.equals(key)
+              && "opportunistic".equals(disk.get("pendingMode"))
+              && ++fallbackReads[0] == 3) system.put(Config.SPECIFIER, "manual.example");
+        };
+    assertThrows(SecurityException.class, () -> Config.select(context, null));
+    Config.recover(context);
+    Config.release(context);
+    assertEquals(writesBefore, systemWrites);
+    assertEquals("hostname", system.get(Config.MODE));
+    assertEquals("manual.example", system.get(Config.SPECIFIER));
+  }
+
+  @Test
+  public void restartWithExactPendingTargetRecoversOwnership() {
+    disk.put("pendingMode", "hostname");
+    disk.put("pendingHost", "dns.example");
+    system.put(Config.MODE, "hostname");
+    system.put(Config.SPECIFIER, "dns.example");
+    Config.recover(context);
+    assertTrue(Config.ownsStrict(context));
+    Config.release(context);
+    assertEquals("opportunistic", system.get(Config.MODE));
+  }
+
   @After
   public void close() {
     settings.close();

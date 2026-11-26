@@ -504,7 +504,7 @@ public final class MainActivity extends Activity {
     route.route(vpn, healthy);
     serviceControl.setText(live ? "Manage monitoring   ›" : "Start monitoring   ›");
     boolean changed =
-        !host.getText().toString().trim().equals(prefs.getString("host", ""))
+        !host.getText().toString().trim().equalsIgnoreCase(prefs.getString("host", ""))
             || !address.getText().toString().trim().equals(prefs.getString("address", ""));
     boolean pending = !command.isEmpty() && SystemClock.elapsedRealtime() - commandTime < 900;
     start.setEnabled(!pending && (!live || changed));
