@@ -25,6 +25,23 @@ This is useful when a Pi-hole is reachable only through a private network such a
 4. Connect the VPN, then tap **Start monitoring**. If a different strict provider is already active, select Automatic in Android's Private DNS settings before handing control to the app.
 5. Check filtering with mobile data while Wi-Fi is off. Disconnect the VPN and open a previously unused hostname. Reconnect the VPN and confirm that the app shows **Private DNS active** again. Check your resolver log for a query from the phone if you need end-to-end evidence.
 
+## Remembered settings and optional local defaults
+
+While monitoring is stopped, both fields remember your edits on the device, even if you leave before tapping **Start monitoring**. Starting the service validates and saves the active configuration. Reopening the app or installing a signed update preserves it. Clearing application data or uninstalling removes saved settings.
+
+Public builds start with empty fields and example placeholders. To prefill your own resolver on a fresh installation, create the following file in your local checkout:
+
+`app/src/personal/res/values/resolver_defaults.xml`
+
+```xml
+<resources>
+    <string name="suggested_resolver_hostname" translatable="false">dns.example.net</string>
+    <string name="suggested_resolver_address" translatable="false">192.0.2.53</string>
+</resources>
+```
+
+Replace both examples with your endpoint. Run `./gradlew :app:assemblePersonal`, sign the APK from `app/build/outputs/apk/personal/` with your installation's signing key and install it with `adb install -r`. The personal APK contains the values as readable resources. Keep that APK local. Git ignores the personal source directory, and the standard debug and release builds always use the neutral defaults. Saved device settings take precedence over suggestions.
+
 ## What the health check does
 
 | Event | Action |

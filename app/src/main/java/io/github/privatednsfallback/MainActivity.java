@@ -9,7 +9,9 @@ import android.graphics.Typeface;
 import android.net.InetAddresses;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.widget.*;
 import java.util.Locale;
 import javax.net.ssl.SNIHostName;
@@ -42,9 +44,9 @@ public final class MainActivity extends Activity {
         state = label("", 18);
         state.setPadding(0,pad/2,0,pad);
         label("Private DNS hostname", 16);
-        hostname = input("dns.example.net", prefs.getString("host",""));
+        hostname = input("dns.example.net", "host", R.string.suggested_resolver_hostname);
         label("Resolver IP inside the VPN", 16);
-        address = input("192.0.2.53", prefs.getString("address",""));
+        address = input("192.0.2.53", "address", R.string.suggested_resolver_address);
         action = new Button(this);
         action.setOnClickListener(v -> toggle());
         form.addView(action);
@@ -62,11 +64,22 @@ public final class MainActivity extends Activity {
         return v;
     }
 
-    private EditText input(String hint, String value) {
+    private EditText input(String hint, String key, int suggestion) {
         EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        input.setHint(hint); input.setText(value); form.addView(input);
+        String draftKey = "draft_" + key;
+        String saved = prefs.getString(key, getString(suggestion));
+        input.setHint(hint);
+        input.setText(prefs.getBoolean("enabled", false) ? saved : prefs.getString(draftKey, saved));
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence text, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence text, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable text) {
+                prefs.edit().putString(draftKey, text.toString()).apply();
+            }
+        });
+        form.addView(input);
         return input;
     }
 
@@ -93,6 +106,7 @@ public final class MainActivity extends Activity {
         String ip = address.getText().toString().trim();
         if (!InetAddresses.isNumericAddress(ip)) { address.setError("Enter an IPv4 or IPv6 address"); return; }
         prefs.edit().putString("host",host).putString("address",ip)
+                .remove("draft_host").remove("draft_address")
                 .putString("status","Checking network").putBoolean("enabled",true).apply();
         startForegroundService(new Intent(this,DnsService.class));
         render();

@@ -1,0 +1,4 @@
+<resources>
+    <string name="suggested_resolver_hostname" translatable="false"></string>
+    <string name="suggested_resolver_address" translatable="false"></string>
+</resources>
