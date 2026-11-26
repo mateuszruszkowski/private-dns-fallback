@@ -20,6 +20,7 @@ public class ConfigConflictTest {
   private Runnable afterCommit = () -> {};
   private MockedStatic<Settings.Global> settings;
   private int systemWrites;
+  private java.util.function.Consumer<String> beforeRead = key -> {};
 
   @Before
   public void setUp() {
@@ -36,7 +37,12 @@ public class ConfigConflictTest {
     settings = mockStatic(Settings.Global.class);
     settings
         .when(() -> Settings.Global.getString(eq(resolver), anyString()))
-        .thenAnswer(a -> system.get(a.getArgument(1)));
+        .thenAnswer(
+            a -> {
+              String key = a.getArgument(1);
+              beforeRead.accept(key);
+              return system.get(key);
+            });
     settings
         .when(() -> Settings.Global.putString(eq(resolver), anyString(), nullable(String.class)))
         .thenAnswer(
@@ -88,6 +94,23 @@ public class ConfigConflictTest {
   @After
   public void close() {
     settings.close();
+  }
+
+  @Test
+  public void manualStrictSelectedAtFinalModeGuardRemainsManual() {
+    int[] modeReads = {0};
+    beforeRead =
+        key -> {
+          if (Config.MODE.equals(key) && systemWrites == 1 && ++modeReads[0] == 2)
+            system.put(Config.MODE, "hostname");
+        };
+    assertThrows(SecurityException.class, () -> Config.select(context, "new.example"));
+    assertFalse(disk.containsKey("pendingMode"));
+    Config.recover(context);
+    Config.release(context);
+    assertEquals(1, systemWrites);
+    assertEquals("hostname", system.get(Config.MODE));
+    assertEquals("new.example", system.get(Config.SPECIFIER));
   }
 
   @Test

@@ -17,12 +17,21 @@ import java.util.Locale;
 import javax.net.ssl.SNIHostName;
 
 public final class MainActivity extends Activity {
-  private static final int INK = 0xff162d2c,
+  private int INK = 0xff162d2c,
       SECONDARY = 0xff435956,
       GOOD = 0xff086950,
       WARN = 0xff895416,
       DANGER = 0xffab3035;
-  private LinearLayout page, rows;
+  private LinearLayout page, overview, setup, hero;
+  private TextView provider, serviceControl;
+  private Button statusTab, setupTab;
+  private ScrollView scroll;
+  private boolean configuring;
+  private int background, surface, track, stroke;
+  private RouteDiagram route;
+  private final LinearLayout[] lines = new LinearLayout[8];
+  private final TextView[] names = new TextView[8];
+  private final View[] lights = new View[8];
   private TextView summary;
   private EditText host, address;
   private Button start, stop;
@@ -44,67 +53,238 @@ public final class MainActivity extends Activity {
   public void onCreate(Bundle saved) {
     super.onCreate(saved);
     prefs = Config.prefs(this);
-    ScrollView scroll = new ScrollView(this);
-    scroll.setBackgroundColor(0xfff2f6f4);
-    scroll.setOnApplyWindowInsetsListener(
+    boolean night =
+        (getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+            == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    background = night ? 0xff101b1b : 0xfff3f6f4;
+    surface = night ? 0xff1a2a29 : Color.WHITE;
+    track = night ? 0xff263936 : 0xffe1e9e5;
+    stroke = night ? 0xff344844 : 0xffd6dfda;
+    INK = night ? 0xffeff7f4 : 0xff132c28;
+    SECONDARY = night ? 0xffb8c9c3 : 0xff466059;
+    GOOD = night ? 0xff81dabc : 0xff11634c;
+    WARN = night ? 0xffffce87 : 0xff8a5316;
+    DANGER = night ? 0xffffa7a1 : 0xffa32b26;
+    LinearLayout root = column();
+    root.setBackgroundColor(background);
+    root.setFocusableInTouchMode(true);
+    root.setOnApplyWindowInsetsListener(
         (v, insets) -> {
           var bars =
-              insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-          v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+              insets.getInsets(
+                  WindowInsets.Type.systemBars()
+                      | WindowInsets.Type.displayCutout()
+                      | WindowInsets.Type.ime());
+          v.setPadding(dp(20) + bars.left, bars.top, dp(20) + bars.right, bars.bottom);
           return insets;
         });
-    page = new LinearLayout(this);
-    page.setOrientation(LinearLayout.VERTICAL);
-    page.setPadding(dp(20), dp(20), dp(20), dp(28));
-    scroll.addView(page);
-    setContentView(scroll);
-    page.addView(text("Private DNS Fallback", 27, true));
-    summary = text("", 17, true);
-    summary.setPadding(0, dp(6), 0, dp(14));
+    setContentView(root);
+    LinearLayout toolbar = new LinearLayout(this);
+    toolbar.setGravity(Gravity.CENTER_VERTICAL);
+    toolbar.setPadding(0, dp(9), 0, dp(7));
+    root.addView(toolbar);
+    ImageView icon = new ImageView(this);
+    icon.setImageResource(R.drawable.ic_dns);
+    icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+    toolbar.addView(icon, dp(23), dp(23));
+    TextView name = text("Private DNS Fallback", 18, true);
+    name.setPadding(dp(10), 0, 0, 0);
+    toolbar.addView(name);
+    toolbar.setMinimumHeight(dp(54));
+    LinearLayout tabs = new LinearLayout(this);
+    tabs.setPadding(dp(3), dp(3), dp(3), dp(3));
+    tabs.setBackground(shape(track, 14));
+    root.addView(tabs);
+    statusTab = tab(tabs, "Overview", false);
+    setupTab = tab(tabs, "Setup", true);
+    scroll = new ScrollView(this);
+    scroll.setVerticalScrollBarEnabled(false);
+    root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+    LinearLayout body = column();
+    body.setPadding(0, dp(15), 0, dp(20));
+    scroll.addView(body);
+    overview = column();
+    setup = column();
+    body.addView(overview);
+    body.addView(setup);
+    hero = column();
+    hero.setPadding(dp(18), dp(16), dp(18), dp(12));
+    hero.setBackground(shape(0xff173e35, 20));
+    overview.addView(hero);
+    TextView caption = text("DNS connection", 13, true);
+    caption.setTextColor(0xffb6d7c9);
+    hero.addView(caption);
+    summary = text("", 28, true);
+    summary.setTextColor(Color.WHITE);
+    summary.setPadding(0, dp(4), 0, dp(4));
     summary.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
-    page.addView(summary);
-    rows = new LinearLayout(this);
-    rows.setOrientation(LinearLayout.VERTICAL);
-    rows.setBackground(card());
-    page.addView(rows);
-    for (int i = 0; i < checks.length; i++) {
-      final int index = i;
-      TextView row = text("", 15, false);
-      row.setPadding(dp(14), dp(6), dp(12), dp(6));
-      row.setMinHeight(dp(48));
-      row.setGravity(Gravity.CENTER_VERTICAL);
-      row.setFocusable(true);
-      row.setOnClickListener(v -> details(index));
-      checks[i] = row;
-      rows.addView(row);
-    }
-    TextView endpoint = text("Resolver configuration", 20, true);
-    endpoint.setPadding(0, dp(18), 0, dp(5));
-    page.addView(endpoint);
-    host =
-        input(
-            "Private DNS hostname",
-            "dns.example.net",
-            "host",
-            R.string.suggested_resolver_hostname);
-    address = input("VPN address", "192.0.2.53", "address", R.string.suggested_resolver_address);
+    hero.addView(summary);
+    provider = text("", 15, false);
+    provider.setTextColor(0xffd4ebe1);
+    hero.addView(provider);
+    route = new RouteDiagram(this);
+    LinearLayout.LayoutParams drawing =
+        new LinearLayout.LayoutParams(
+            -1, dp(41) + (int) (16 * getResources().getDisplayMetrics().scaledDensity));
+    drawing.topMargin = dp(12);
+    hero.addView(route, drawing);
+    section(overview, "Connection checks");
+    LinearLayout networkRows = group(overview);
+    for (int i : new int[] {0, 2, 3, 4}) buildRow(networkRows, i);
+    serviceControl = text("", 15, true);
+    serviceControl.setGravity(Gravity.CENTER);
+    serviceControl.setMinHeight(dp(48));
+    serviceControl.setBackground(clickable(surface, 12));
+    serviceControl.setFocusable(true);
+    serviceControl.setOnClickListener(
+        v -> {
+          if (DnsService.running) selectTab(true);
+          else if (grant() && !prefs.getString("host", "").isEmpty()) save();
+          else selectTab(true);
+        });
+    LinearLayout.LayoutParams controlLp = new LinearLayout.LayoutParams(-1, -2);
+    controlLp.topMargin = dp(12);
+    overview.addView(serviceControl, controlLp);
+    section(setup, "Resolver");
+    page = group(setup);
+    page.setPadding(dp(14), dp(14), dp(14), dp(14));
+    host = input("TLS hostname", "dns.example.net", "host", R.string.suggested_resolver_hostname);
+    address =
+        input("Address inside VPN", "192.0.2.53", "address", R.string.suggested_resolver_address);
     start = new Button(this);
+    start.setAllCaps(false);
+    start.setTextSize(15);
+    start.setMinHeight(dp(48));
+    start.setTextColor(Color.WHITE);
+    start.setBackground(clickable(0xff17694e, 12));
     start.setOnClickListener(v -> save());
     page.addView(start);
+    section(setup, "Permissions & startup");
+    LinearLayout deviceRows = group(setup);
+    for (int i : new int[] {1, 5, 6, 7}) buildRow(deviceRows, i);
     stop = new Button(this);
-    stop.setText("Stop and use Automatic DNS");
+    stop.setAllCaps(false);
+    stop.setText("Stop monitoring");
+    stop.setTextColor(DANGER);
+    stop.setBackground(clickable(surface, 12));
+    stop.setMinHeight(dp(48));
     stop.setOnClickListener(v -> send(DnsService.STOP, null, null));
-    page.addView(stop);
-    page.setFocusableInTouchMode(true);
-    page.requestFocus();
+    LinearLayout.LayoutParams stopLp = new LinearLayout.LayoutParams(-1, -2);
+    stopLp.topMargin = dp(12);
+    setup.addView(stop, stopLp);
+    root.requestFocus();
+    selectTab(saved != null ? saved.getBoolean("setup") : prefs.getString("host", "").isEmpty());
     render();
   }
 
-  private GradientDrawable card() {
-    GradientDrawable shape = new GradientDrawable();
-    shape.setColor(Color.WHITE);
-    shape.setCornerRadius(dp(14));
-    return shape;
+  @Override
+  protected void onSaveInstanceState(Bundle out) {
+    super.onSaveInstanceState(out);
+    out.putBoolean("setup", configuring);
+  }
+
+  private LinearLayout column() {
+    LinearLayout l = new LinearLayout(this);
+    l.setOrientation(LinearLayout.VERTICAL);
+    return l;
+  }
+
+  private GradientDrawable shape(int color, int radius) {
+    GradientDrawable d = new GradientDrawable();
+    d.setColor(color);
+    d.setCornerRadius(dp(radius));
+    return d;
+  }
+
+  private android.graphics.drawable.Drawable clickable(int color, int radius) {
+    return new android.graphics.drawable.RippleDrawable(
+        android.content.res.ColorStateList.valueOf(0x2279a38d),
+        shape(color, radius),
+        shape(Color.WHITE, radius));
+  }
+
+  private Button tab(LinearLayout tabs, String label, boolean edit) {
+    Button b = new Button(this);
+    b.setText(label);
+    b.setAllCaps(false);
+    b.setTextSize(14);
+    b.setMinHeight(dp(48));
+    b.setMinimumWidth(0);
+    b.setStateListAnimator(null);
+    b.setOnClickListener(v -> selectTab(edit));
+    tabs.addView(b, new LinearLayout.LayoutParams(0, -2, 1));
+    return b;
+  }
+
+  private void selectTab(boolean edit) {
+    configuring = edit;
+    overview.setVisibility(edit ? View.GONE : View.VISIBLE);
+    setup.setVisibility(edit ? View.VISIBLE : View.GONE);
+    for (Button b : new Button[] {statusTab, setupTab}) {
+      boolean active = b == (edit ? setupTab : statusTab);
+      b.setSelected(active);
+      b.setTextColor(active ? INK : SECONDARY);
+      b.setTypeface(Typeface.create(active ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
+      b.setBackground(clickable(active ? surface : track, 11));
+    }
+    if (!edit) {
+      getSystemService(android.view.inputmethod.InputMethodManager.class)
+          .hideSoftInputFromWindow(scroll.getWindowToken(), 0);
+      host.clearFocus();
+      address.clearFocus();
+    }
+    scroll.scrollTo(0, 0);
+  }
+
+  private void section(LinearLayout parent, String title) {
+    TextView v = text(title, 18, true);
+    v.setPadding(dp(2), dp(16), 0, dp(8));
+    parent.addView(v);
+  }
+
+  private LinearLayout group(LinearLayout parent) {
+    LinearLayout l = column();
+    l.setBackground(shape(surface, 16));
+    parent.addView(l);
+    return l;
+  }
+
+  private void buildRow(LinearLayout group, int i) {
+    if (group.getChildCount() > 0) {
+      View divider = new View(this);
+      divider.setBackgroundColor(stroke);
+      LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, 1);
+      lp.leftMargin = dp(32);
+      group.addView(divider, lp);
+    }
+    LinearLayout l = new LinearLayout(this);
+    l.setGravity(Gravity.CENTER_VERTICAL);
+    l.setPadding(dp(14), dp(8), dp(12), dp(8));
+    l.setMinimumHeight(dp(50));
+    l.setFocusable(true);
+    l.setBackground(clickable(Color.TRANSPARENT, 12));
+    l.setOnClickListener(v -> details(i));
+    group.addView(l);
+    View light = new View(this);
+    l.addView(light, dp(8), dp(8));
+    lights[i] = light;
+    LinearLayout words = column();
+    words.setPadding(dp(10), 0, dp(6), 0);
+    l.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+    TextView title = text("", 15, true);
+    words.addView(title);
+    names[i] = title;
+    TextView info = text("", 13, false);
+    info.setTextColor(SECONDARY);
+    words.addView(info);
+    checks[i] = info;
+    lines[i] = l;
+    TextView arrow = text("›", 20, false);
+    arrow.setTextColor(SECONDARY);
+    l.addView(arrow);
+    for (View child : new View[] {light, words, title, info, arrow})
+      child.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
   }
 
   private int dp(int n) {
@@ -144,7 +324,18 @@ public final class MainActivity extends Activity {
             prefs.edit().putString("draft_" + key, s.toString()).apply();
           }
         });
-    page.addView(edit);
+    edit.setTextColor(INK);
+    edit.setHintTextColor(SECONDARY);
+    edit.setTextSize(16);
+    edit.setMinHeight(dp(48));
+    var inputBox = shape(background, 9);
+    inputBox.setStroke(dp(1), stroke);
+    edit.setBackground(inputBox);
+    edit.setPadding(dp(12), dp(8), dp(12), dp(8));
+    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+    lp.topMargin = dp(3);
+    lp.bottomMargin = dp(12);
+    page.addView(edit, lp);
     return edit;
   }
 
@@ -201,9 +392,15 @@ public final class MainActivity extends Activity {
   }
 
   private void row(int i, String title, String value, int color) {
-    String s = "●   " + title + "  ·  " + value;
-    if (!s.contentEquals(checks[i].getText())) checks[i].setText(s);
-    checks[i].setTextColor(color);
+    if (!title.contentEquals(names[i].getText())) names[i].setText(title);
+    if (!value.contentEquals(checks[i].getText())) {
+      checks[i].setText(value);
+      lines[i].setContentDescription(title + ", " + value + ". Show details");
+    }
+    if (!Integer.valueOf(color).equals(lights[i].getTag())) {
+      lights[i].setBackground(shape(color, 8));
+      lights[i].setTag(color);
+    }
   }
 
   private void render() {
@@ -211,16 +408,6 @@ public final class MainActivity extends Activity {
     boolean strict = "hostname".equals(Config.read(this, Config.MODE));
     boolean owned = Config.ownsStrict(this);
     boolean stranded = !live && owned;
-    String headline =
-        live
-            ? DnsService.message
-            : stranded
-                ? "Private DNS selected · monitoring inactive"
-                : prefs.getString(
-                    "notice",
-                    desired ? "Monitoring inactive · start to resume" : "Monitoring stopped");
-    if (!headline.contentEquals(summary.getText())) summary.setText(headline);
-    summary.setTextColor(stranded ? DANGER : INK);
     row(
         0,
         "Monitoring service",
@@ -248,7 +435,7 @@ public final class MainActivity extends Activity {
         "Private resolver",
         probe == null
             ? "Unchecked"
-            : (probe ? "TLS and DNS OK" : "Unreachable") + " · " + probeAge + " s",
+            : (probe ? "TLS verified" : "Unreachable") + " · " + age(probeAge),
         Boolean.TRUE.equals(probe) && probeAge < 60 ? GOOD : WARN);
     Boolean sys = DnsService.systemOk;
     String selected =
@@ -260,7 +447,7 @@ public final class MainActivity extends Activity {
         "Android DNS",
         selected
             + (Boolean.TRUE.equals(sys)
-                ? " · lookup OK · " + systemAge + " s"
+                ? " · lookup OK · " + age(systemAge)
                 : Boolean.FALSE.equals(sys) ? " · lookup failed" : ""),
         stranded
             ? DANGER
@@ -279,14 +466,57 @@ public final class MainActivity extends Activity {
         "Status notification",
         notifications() ? "Enabled" : "Hidden",
         notifications() ? GOOD : WARN);
+    boolean healthy =
+        live
+            && owned
+            && validated
+            && Boolean.TRUE.equals(sys)
+            && Boolean.TRUE.equals(probe)
+            && systemAge < 60
+            && probeAge < 60;
+    String headline =
+        stranded
+            ? "Action needed"
+            : !live
+                ? "Monitoring stopped"
+                : healthy
+                    ? "Private DNS active"
+                    : !grant() ? "Permission needed" : !strict ? "Automatic DNS" : "Checking DNS";
+    if (!headline.contentEquals(summary.getText())) summary.setText(headline);
+    String sub =
+        stranded
+            ? "Open Setup to restore Automatic DNS"
+            : healthy
+                ? prefs.getString("host", "")
+                : !live
+                    ? (desired ? "Resume monitoring in Setup" : "Start monitoring in Setup")
+                    : !strict
+                        ? (vpn
+                            ? "Network resolver · VPN connected"
+                            : "Network resolver · VPN disconnected")
+                        : DnsService.message;
+    if (!sub.contentEquals(provider.getText())) provider.setText(sub);
+    route.route(vpn, healthy);
+    serviceControl.setText(live ? "Manage monitoring   ›" : "Start monitoring   ›");
     boolean changed =
         !host.getText().toString().trim().equals(prefs.getString("host", ""))
             || !address.getText().toString().trim().equals(prefs.getString("address", ""));
     boolean pending = !command.isEmpty() && SystemClock.elapsedRealtime() - commandTime < 900;
     start.setText(live ? "Apply changes" : "Start monitoring");
     start.setEnabled(!pending && (!live || changed));
+    start.setText(
+        live && !changed ? "Settings saved" : live ? "Apply changes" : "Start monitoring");
+    start.setAlpha(start.isEnabled() ? 1f : .65f);
     stop.setVisibility(live || desired || stranded ? View.VISIBLE : View.GONE);
     stop.setEnabled(!pending);
+  }
+
+  private String age(long s) {
+    return s < 5
+        ? "just now"
+        : s < 15
+            ? "<15 s ago"
+            : s < 30 ? "<30 s ago" : s < 60 ? "<1 min ago" : (s / 60) + " min ago";
   }
 
   private void details(int i) {
@@ -327,7 +557,10 @@ public final class MainActivity extends Activity {
                 + " on port 853. If this fails, check the hostname, VPN address, firewall and"
                 + " certificate.",
             "Edit resolver",
-            () -> host.requestFocus());
+            () -> {
+              selectTab(true);
+              host.requestFocus();
+            });
         break;
       case 4:
         dialog(

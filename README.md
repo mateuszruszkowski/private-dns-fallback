@@ -27,9 +27,9 @@ This is useful when a Pi-hole is reachable only through a private network such a
 
 ## Service controls and startup
 
-Open the app to see the live status panel. Tap a row for its evidence and a relevant action. The **Monitoring service** row shows whether the service is running in the current process. **Resume after restart** shows the saved request to restart after boot or an app update. Vendor autostart controls can still affect delivery.
+Open **Overview** to see the current DNS mode and connection checks. Use **Setup** for the resolver, permissions and startup controls. Tap a row for its evidence and a relevant action. The **Monitoring service** row shows whether the service is running in the current process. **Resume after restart** shows the saved request to restart after boot or an app update. Vendor autostart controls can still affect delivery.
 
-**Start monitoring** starts an independent foreground service. Back, Home and closing the control screen leave monitoring active. To change an endpoint while monitoring, edit the fields and tap **Apply changes**. **Stop and use Automatic DNS** ends monitoring, disables resume after boot, and releases the strict setting if the app still owns it.
+**Start monitoring** starts an independent foreground service. Back, Home and closing the control screen leave monitoring active. To change an endpoint while monitoring, edit the fields and tap **Apply changes**. **Stop monitoring** ends monitoring, disables resume after boot, and releases the strict setting if the app still owns it.
 
 **Private resolver** reports a TLS/DNS probe through the VPN. **Android DNS** shows the system setting and the outcome of a separate uncached Android lookup. A successful lookup does not identify which IP Android validated for DoT. Repeated system lookup failures trigger Automatic DNS and a retry delay. Open **Background activity** and **Resume after restart** for setup guidance if your phone restricts the service.
 
@@ -65,7 +65,7 @@ The foreground service responds to Android network callbacks and rechecks approx
 
 **WRITE_SECURE_SETTINGS** is a broad Android development permission. The app uses it for two global settings, `private_dns_mode` and `private_dns_specifier`. The resolver configuration stays in the app's device-protected storage so monitoring can resume at boot. The app sends its health query to the chosen resolver and has no analytics or external control service.
 
-Tap **Stop and use Automatic DNS** before uninstalling. Force-stop, process termination, revoking the grant and uninstalling can prevent cleanup while strict DNS is active. If that happens, select **Automatic** in Android's Private DNS settings, or run:
+In **Setup**, tap **Stop monitoring** before uninstalling. Force-stop, process termination, revoking the grant and uninstalling can prevent cleanup while strict DNS is active. If that happens, select **Automatic** in Android's Private DNS settings, or run:
 
 ```sh
 adb shell settings put global private_dns_mode opportunistic

@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application android:label="Private DNS Fallback" android:icon="@drawable/ic_dns"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false"
+        android:theme="@style/MonitorTheme" android:allowBackup="false"
         android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

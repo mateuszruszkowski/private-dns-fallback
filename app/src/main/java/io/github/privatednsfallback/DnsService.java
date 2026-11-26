@@ -136,13 +136,13 @@ public final class DnsService extends Service {
       return START_NOT_STICKY;
     }
     if (!p.getBoolean("observing", false)) {
+      DnsPair restored = Config.actual(this);
       if (!Config.matches(this)
-          || ("hostname".equals(Config.read(this, Config.MODE))
-              && !p.getString("host", "").equals(Config.read(this, Config.SPECIFIER)))) {
+          || ("hostname".equals(restored.mode) && !p.getString("host", "").equals(restored.host))) {
         stopMonitoring("Monitoring stopped · Android DNS was changed");
         return START_NOT_STICKY;
       }
-      Config.observe(p.edit(), Config.actual(this)).commit();
+      Config.observe(p.edit(), restored).commit();
     }
     running = true;
     directOk = systemOk = null;
