@@ -384,6 +384,7 @@ public final class MainActivity extends Activity {
     commandTime = SystemClock.elapsedRealtime();
     try {
       startForegroundService(i);
+      if (!DnsService.STOP.equals(action)) selectTab(false);
     } catch (IllegalStateException | SecurityException e) {
       command = "";
       dialog(
@@ -493,7 +494,7 @@ public final class MainActivity extends Activity {
             : healthy
                 ? prefs.getString("host", "")
                 : !live
-                    ? (desired ? "Resume monitoring in Setup" : "Start monitoring in Setup")
+                    ? prefs.getString("notice", desired ? "Start to resume monitoring" : "Ready to start")
                     : !strict
                         ? (vpn
                             ? "Network resolver · VPN connected"
@@ -506,7 +507,6 @@ public final class MainActivity extends Activity {
         !host.getText().toString().trim().equals(prefs.getString("host", ""))
             || !address.getText().toString().trim().equals(prefs.getString("address", ""));
     boolean pending = !command.isEmpty() && SystemClock.elapsedRealtime() - commandTime < 900;
-    start.setText(live ? "Apply changes" : "Start monitoring");
     start.setEnabled(!pending && (!live || changed));
     start.setText(
         live && !changed ? "Settings saved" : live ? "Apply changes" : "Start monitoring");

@@ -1,6 +1,7 @@
 package io.github.privatednsfallback;
 
 import android.app.*;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.*;
@@ -69,11 +70,7 @@ public final class DnsService extends Service {
       startForeground(1, notification("Checking network"));
     } catch (IllegalStateException | SecurityException e) {
       closing = true;
-      try {
-        Config.release(this);
-      } catch (SecurityException unavailable) {
-      }
-      p.edit().putString("notice", "Background launch blocked · open app to resume").apply();
+      backgroundLaunchBlocked(this);
       stopSelf();
       return;
     }
@@ -96,6 +93,16 @@ public final class DnsService extends Service {
       }
       edit.commit();
     }
+  }
+
+  static void backgroundLaunchBlocked(Context context) {
+    String notice = "Background launch blocked · open the app to resume";
+    try {
+      Config.release(context);
+    } catch (SecurityException denied) {
+      notice = "Background launch blocked · check Android Private DNS";
+    }
+    Config.prefs(context).edit().putString("notice", notice).apply();
   }
 
   @Override

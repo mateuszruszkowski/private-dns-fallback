@@ -14,7 +14,11 @@ public final class BootReceiver extends BroadcastReceiver {
         && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) return;
     SharedPreferences prefs = Config.prefs(context);
     if (prefs.getBoolean("enabled", false) || Config.ownsStrict(context)) {
-      context.startForegroundService(new Intent(context, DnsService.class));
+      try {
+        context.startForegroundService(new Intent(context, DnsService.class));
+      } catch (IllegalStateException | SecurityException denied) {
+        DnsService.backgroundLaunchBlocked(context);
+      }
     }
   }
 }
